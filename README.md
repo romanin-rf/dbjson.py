@@ -1,2 +1,2 @@
 # dbjson.py
-Allows to use JSON as a database with tables and stuff, but without a language like in SQL
+Allows you to use `JSON` as a database with __tables and stuff__, but without the *semblance of a language* as in `SQL`. Although in terms of functionality, I'm aiming for `SQLite3`.
