@@ -14,6 +14,7 @@ class __default__:
         "tables": []
     }
     types = ["int", "float", "str", "bytes", "bool"]
+    finder_mode = [-1]
 
 class __func__:
     def encode_base64(data: Any) -> bytes:
@@ -99,6 +100,13 @@ class DataPrimaryKeyError(Exception):
     def __str__(self):
         return self.message
 
+class TableIdOrNameNotFound(Exception):
+    def __init__(self, message: str="Not specified table name or at least table ID") -> None:
+        self.message = message
+    
+    def __str__(self):
+        return self.message
+
 # Рабочий класс
 class DBJSON():
     def __init__(self, path: str) -> None:
@@ -115,9 +123,8 @@ class DBJSON():
     def exists_table(self, table_name: str, *, data=None) -> bool:
         return (table_name in self.tables_list(data=(__func__.load_dbjson(self.path) if (data is None) else data)))
     
-    def get_table_index(self, table_name: str, *, data=None) -> Union[int, None]:
-        index = None
-        c = 0
+    def get_table_index(self, table_name: str, *, data=None) -> int:
+        index, c = None, 0
         for i in self.tables_list(data=(__func__.load_dbjson(self.path) if (data is None) else data)):
             if i == table_name:
                 index = c
@@ -127,13 +134,23 @@ class DBJSON():
             raise TableExistsError(table_name)
         return index
 
-    def colons_list(self, table_name: str, *, data=None) -> dict[str, tuple[str, bool]]:
+    def colons_list(self, table_id_or_name: Union[int, str], *, data=None) -> dict[str, tuple[str, bool]]:
         data = __func__.load_dbjson(self.path) if (data is None) else data
-        if self.exists_table(table_name, data=data):
-            return data["tables"][self.get_table_index(table_name, data=data)]["colons"]
-        else:
-            raise TableIndexError()
+        if type(table_id_or_name) == str:
+            if self.exists_table(table_id_or_name, data=data):
+                return data["tables"][self.get_table_index(table_id_or_name, data=data)]["colons"]
+            else:
+                raise TableIndexError()
+        elif type(table_id_or_name) == int:
+            try:
+                return data["tables"][table_id_or_name]["colons"]
+            except IndexError:
+                raise TableIndexError()
     
+    def get_colon_index(self, table_id_or_name: Union[int, str], colon_name: str, *, data=None) -> Union[int, None]:
+        colons_list = list(self.colons_list(table_id_or_name, data=data).key())
+        return colons_list.index(colon_name)
+
     def create_table(self, table_name: str, colons: dict[str, tuple[str, bool]]) -> None:
         data = __func__.load_dbjson(self.path)
         if not(table_name in self.tables_list(data=data)):
@@ -148,10 +165,8 @@ class DBJSON():
         if self.exists_table(table_name, data=db_data):
             cl = list(self.colons_list(table_name).values())
             if len(cl) == len(data):
-                idx = 0
-                while idx != len(data):
-                    data[idx] = __func__.type_handler(data[idx], cl[idx][0])
-                    idx += 1
+                for idx, d in enumerate(data):
+                    data[idx] = __func__.type_handler(d, cl[idx][0])
                 table_index = self.get_table_index(table_name)
                 if not __func__.test_primary_key(cl, db_data["tables"][table_index]["data"], data):
                     raise DataPrimaryKeyError()
@@ -161,3 +176,19 @@ class DBJSON():
                 raise DataListLengthError()
         else:
             raise TableExistsError(table_name)
+    
+    def find_data(self, table_name: str, colon_name: str, value: Any, mode: int=-1) -> list[list]:
+        db_data, finded_data = __func__.load_dbjson(self.path), []
+        table_index = self.get_table_index(table_name, data=db_data)
+        colons_index = self.get_colon_index(table_index, colon_name, data=db_data)
+        for d in db_data["tables"][table_index]["data"]:
+            if d[colons_index] == value:
+                if mode != -1:
+                    if mode == 0:
+                        break
+                    elif mode > 0:
+                        finded_data.append(d)
+                        mode -= 1
+                else:
+                    finded_data.append(d)
+        return finded_data
