@@ -135,12 +135,12 @@ class DBJSON():
 
 	def colons_list(self, table_id_or_name: Union[int, str], *, data=None) -> dict[str, tuple[str, bool]]:
 		data = __func__.load_dbjson(self.path) if (data is None) else data
-		if type(table_id_or_name) == str:
+		if table_id_or_name is str:
 			if self.exists_table(table_id_or_name, data=data):
 				return data["tables"][self.get_table_index(table_id_or_name, data=data)]["colons"]
 			else:
 				raise TableIndexError()
-		elif type(table_id_or_name) == int:
+		elif table_id_or_name is int:
 			try:
 				return data["tables"][table_id_or_name]["colons"]
 			except IndexError:
@@ -176,8 +176,8 @@ class DBJSON():
 		else:
 			raise TableExistsError(table_name)
 	
-	def find_data(self, table_name: str, colon_name: str, value: Any, *, max_count: int=-1) -> Union[list[tuple[int, list]], list]:
-		db_data, finded_data = __func__.load_dbjson(self.path), []
+	def find_data(self, table_name: str, colon_name: str, value: Any, *, max_count: int=-1, data=None) -> Union[list[tuple[int, list]], list]:
+		db_data, finded_data = (__func__.load_dbjson(self.path) if (data is None) else data), []
 		table_index = self.get_table_index(table_name, data=db_data)
 		colons_index = self.get_colon_index(table_index, colon_name, data=db_data)
 		for idx, d in enumerate(db_data["tables"][table_index]["data"]):
@@ -186,3 +186,10 @@ class DBJSON():
 			if d[colons_index] == value:
 				finded_data.append((idx, d))
 		return finded_data
+	
+	def delect_data(self, table_name: str, colon_name: str, value: Any, *, max_delect: int=-1, data=None) -> None:
+		db_data = __func__.load_dbjson(self.path) if (data is None) else data
+		datas, table_idx = self.find_data(table_name, colon_name, value, max_count=max_delect, data=db_data), self.get_table_index(table_name, data=db_data)
+		for i in datas:
+			db_data["tables"][table_idx].pop(i[0])
+		__func__.upload_dbjson(self.path, db_data)
